@@ -158,7 +158,11 @@ public class PasswordManager
         try
         {
             passwordsByApplication.put(applicationName, passwordGenerator.generatePassword());
-            availableApplications.add(applicationName);
+            // Only add it to the list if it's not already in there
+            if (!availableApplications.contains(applicationName))
+            {
+                availableApplications.add(applicationName);
+            }
             executorService.submit(new StorePasswordTask());
         }
         finally
@@ -183,6 +187,11 @@ public class PasswordManager
         {
             passwordsLock.writeLock().unlock();
         }
+    }
+
+    public void changePassword(String applicationName)
+    {
+        generatePassword(applicationName);
     }
 
     public void changeMasterPassword(String newMasterPassword)

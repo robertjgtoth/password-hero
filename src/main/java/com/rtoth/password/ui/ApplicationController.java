@@ -114,7 +114,6 @@ public class ApplicationController extends Application
             });
 
             AnchorPane.setLeftAnchor(addNewApplication, 0.0);
-//            AnchorPane.setRightAnchor(addNewApplication, 0.0);
             AnchorPane.setBottomAnchor(addNewApplication, 0.0);
             root.getChildren().add(addNewApplication);
 
@@ -130,7 +129,6 @@ public class ApplicationController extends Application
                 }
             });
 
-//            AnchorPane.setLeftAnchor(changeMasterPassword, 0.0);
             AnchorPane.setRightAnchor(changeMasterPassword, 0.0);
             AnchorPane.setBottomAnchor(changeMasterPassword, 0.0);
             root.getChildren().add(changeMasterPassword);
@@ -204,17 +202,30 @@ public class ApplicationController extends Application
                 HBox controlsHBox = new HBox(5);
 
                 Button show = new Button("show");
-                show.setAlignment(Pos.CENTER_RIGHT);
                 show.setOnAction(event -> showApplicationPassword(item));
 
+                Button change = new Button("change");
+                change.setOnAction(event ->
+                {
+                    Alert confirmation = new Alert(Alert.AlertType.CONFIRMATION,
+                        "Change password for " + item + "?", ButtonType.YES, ButtonType.NO);
+                    confirmation.setTitle("Confirmation");
+                    confirmation.setHeaderText("Confirm Password Change");
+                    Optional<ButtonType> result = confirmation.showAndWait();
+                    if (result.isPresent() && result.get().equals(ButtonType.YES))
+                    {
+                        passwordManager.changePassword(item);
+                        showApplicationPassword(item);
+                    }
+                });
+
                 Button delete = new Button("delete");
-                delete.setAlignment(Pos.CENTER_RIGHT);
                 delete.setOnAction(event ->
                 {
                     Alert confirmation = new Alert(Alert.AlertType.CONFIRMATION,
                         "Delete password for " + item + "?", ButtonType.YES, ButtonType.NO);
-                    confirmation.setTitle("Confirm Delete");
-                    confirmation.setHeaderText("Confirm Deletion of " + item);
+                    confirmation.setTitle("Confirmation");
+                    confirmation.setHeaderText("Confirm Deletion of Password");
                     Optional<ButtonType> result = confirmation.showAndWait();
                     if (result.isPresent() && result.get().equals(ButtonType.YES))
                     {
@@ -222,7 +233,7 @@ public class ApplicationController extends Application
                     }
                 });
 
-                controlsHBox.getChildren().addAll(show, delete);
+                controlsHBox.getChildren().addAll(show, change, delete);
                 AnchorPane.setTopAnchor(controlsHBox, 0.0);
                 AnchorPane.setBottomAnchor(controlsHBox, 0.0);
                 AnchorPane.setRightAnchor(controlsHBox, 0.0);
