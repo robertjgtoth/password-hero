@@ -21,6 +21,7 @@
  */
 package com.rtoth.password.ui;
 
+import com.google.common.base.Preconditions;
 import com.rtoth.password.data.PasswordManager;
 
 import org.jasypt.exceptions.EncryptionOperationNotPossibleException;
@@ -44,7 +45,6 @@ import javafx.scene.layout.AnchorPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.stage.Stage;
-import javafx.util.Callback;
 
 /**
  * FIXME: docs
@@ -61,6 +61,8 @@ public class ApplicationController extends Application
         root.setPrefHeight(600.0);
         root.setPrefWidth(400.0);
 
+        // FIXME: This ListView is sometimes not rendering properly when items
+        //        are deleted. Gotta figure out what's going on there.
         final ListView<String> applicationPasswords =
             new ListView<>(passwordManager.getAvailableApplications());
         applicationPasswords.setCellFactory(param -> new ApplicationPasswordCell());
@@ -87,7 +89,7 @@ public class ApplicationController extends Application
                     if (masterPassword.isPresent())
                     {
                         passwordManager.generatePassword(newApplication.get(), masterPassword.get());
-                        showApplicationPassword(newApplication.get(), masterPassword);
+                        showApplicationPassword(newApplication.get(), masterPassword.get());
                     }
                 }
                 else
@@ -115,41 +117,35 @@ public class ApplicationController extends Application
         return passwordDialog.showAndWait();
     }
 
-    private void showApplicationPassword(String application, Optional<String> masterPassword)
+    private void showApplicationPassword(String application, String masterPassword)
     {
-        if (masterPassword.isPresent())
+        Preconditions.checkNotNull(masterPassword, "masterPassword cannot be null.");
+        try
         {
-            try
+            String savedPassword = passwordManager.getPassword(application, masterPassword);
+            if (savedPassword != null)
             {
-                String savedPassword = passwordManager.getPassword(application, masterPassword.get());
-                if (savedPassword != null)
-                {
-                    Alert alert = new Alert(Alert.AlertType.INFORMATION, savedPassword, ButtonType.OK);
-                    alert.setTitle("Saved password");
-                    alert.setHeaderText("Saved password for " + application + "");
+                Alert alert = new Alert(Alert.AlertType.INFORMATION, savedPassword, ButtonType.OK);
+                alert.setTitle("Saved password");
+                alert.setHeaderText("Saved password for " + application + "");
 
-                    TextField savedPasswordText = new TextField(savedPassword);
-                    savedPasswordText.setEditable(false);
-                    HBox.setHgrow(savedPasswordText, Priority.ALWAYS);
+                TextField savedPasswordText = new TextField(savedPassword);
+                savedPasswordText.setEditable(false);
+                HBox.setHgrow(savedPasswordText, Priority.ALWAYS);
 
-                    HBox hBox = new HBox();
-                    hBox.getChildren().add(savedPasswordText);
-                    hBox.setPadding(new Insets(20));
+                HBox hBox = new HBox();
+                hBox.getChildren().add(savedPasswordText);
+                hBox.setPadding(new Insets(20));
 
-                    alert.getDialogPane().setContent(hBox);
+                alert.getDialogPane().setContent(hBox);
 
-                    alert.showAndWait();
-                }
-            }
-            catch (EncryptionOperationNotPossibleException e)
-            {
-                Alert alert = new Alert(Alert.AlertType.ERROR, "Invalid password!", ButtonType.OK);
                 alert.showAndWait();
             }
         }
-        else
+        catch (EncryptionOperationNotPossibleException e)
         {
-            // What??
+            Alert alert = new Alert(Alert.AlertType.ERROR, "Invalid password!", ButtonType.OK);
+            alert.showAndWait();
         }
     }
 
@@ -169,9 +165,18 @@ public class ApplicationController extends Application
                 HBox hBox = new HBox(5);
                 Label applicationName = new Label(item);
                 Button show = new Button("show");
-                show.setOnAction(event -> showApplicationPassword(item, getMasterPassword()));
+                show.setOnAction(event ->
+                {
+                    Optional<String> masterPassword = getMasterPassword();
+                    if (masterPassword.isPresent())
+                    {
+                        showApplicationPassword(item, masterPassword.get());
+                    }
+                });
                 Button delete = new Button("delete");
                 delete.setOnAction(event -> deleteApplicationPassword(item));
+
+                // FIXME: formatting here is bad
 
                 hBox.getChildren().addAll(applicationName, show, delete);
                 setGraphic(hBox);

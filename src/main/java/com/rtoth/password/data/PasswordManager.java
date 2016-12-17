@@ -33,7 +33,6 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.Properties;
-import java.util.Scanner;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -87,7 +86,9 @@ public class PasswordManager
 
     private void loadExistingPasswords() throws IOException
     {
-        passwordsByApplication.load(new FileInputStream(passwordFile));
+        FileInputStream fis = new FileInputStream(passwordFile);
+        passwordsByApplication.load(fis);
+        fis.close();
         for (Object key : passwordsByApplication.keySet())
         {
             availableApplications.add((String) key);
@@ -151,61 +152,17 @@ public class PasswordManager
         {
             try
             {
-                passwordsByApplication.store(new FileOutputStream(passwordFile), "PasswordsByFile");
-                LOGGER.info("Password saved to file.");
+                FileOutputStream fos = new FileOutputStream(passwordFile);
+                passwordsByApplication.store(fos, "PasswordsByFile");
+                fos.flush();
+                fos.close();
+                LOGGER.info("Encrypted passwords saved to file.");
             }
             catch (Exception e)
             {
                 // FIXME this...
                 LOGGER.warn("Error storing password in file...", e);
             }
-
-        }
-    }
-
-    /** Main method for testing purposes. */
-    public static void main(String args[])
-    {
-        if (args.length == 1)
-        {
-            try
-            {
-                String filePath = args[0];
-
-                Scanner s = new Scanner(System.in);
-
-                PasswordManager passwordManager = new PasswordManager(filePath);
-
-                while (true)
-                {
-
-                    System.out.print("Enter application name: ");
-                    String applicationName = s.nextLine();
-
-                    System.out.print("Enter master password: ");
-                    String masterPassword = s.nextLine();
-
-                    LOGGER.info("You entered {}", applicationName);
-
-                    String password;
-                    if (!passwordManager.hasPassword(applicationName))
-                    {
-                        passwordManager.generatePassword(applicationName, masterPassword);
-                    }
-                    password = passwordManager.getPassword(applicationName, masterPassword);
-
-                    LOGGER.info("Your stored password for {} is {}", applicationName, password);
-                }
-            }
-            catch (RuntimeException re)
-            {
-                LOGGER.warn("Bad file", re);
-                System.exit(-1);
-            }
-        }
-        else
-        {
-            LOGGER.warn("Please provide the password file location.");
         }
     }
 }
