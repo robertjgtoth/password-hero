@@ -22,6 +22,7 @@
 package com.rtoth.password.data;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Maps;
 
 import org.jasypt.encryption.pbe.StandardPBEStringEncryptor;
 import org.jasypt.exceptions.EncryptionOperationNotPossibleException;
@@ -32,9 +33,12 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -54,14 +58,19 @@ public class PasswordManager
 
     private final ObservableList<String> availableApplications = FXCollections.observableArrayList();
 
-    private final Properties passwordsByApplication = new Properties();
+    private final Map<String, String> passwordsByApplication = Maps.newHashMap();
+
+    private final ReadWriteLock passwordsLock = new ReentrantReadWriteLock();
+
+    private StandardPBEStringEncryptor encryptor;
 
     /** File used to store encrypted passwords. */
     private final File passwordFile;
 
-    public PasswordManager(String filePath)
+    public PasswordManager(String filePath, String masterPassword)
     {
         Preconditions.checkNotNull(filePath, "passwordFile cannot be null.");
+        Preconditions.checkNotNull(masterPassword, "masterPassword cannot be null.");
 
         passwordFile = new File(filePath);
 
@@ -72,6 +81,9 @@ public class PasswordManager
             LOGGER.warn(message);
             throw new IllegalArgumentException(message);
         }
+
+        encryptor = new StandardPBEStringEncryptor();
+        encryptor.setPassword(masterPassword);
 
         try
         {
@@ -86,12 +98,18 @@ public class PasswordManager
 
     private void loadExistingPasswords() throws IOException
     {
+        Properties encryptedFileContents = new Properties();
         FileInputStream fis = new FileInputStream(passwordFile);
-        passwordsByApplication.load(fis);
+        encryptedFileContents.load(fis);
         fis.close();
-        for (Object key : passwordsByApplication.keySet())
+        for (Map.Entry<Object, Object> entry : encryptedFileContents.entrySet())
         {
-            availableApplications.add((String) key);
+            String application = encryptor.decrypt((String) entry.getKey());
+            passwordsByApplication.put(
+                application,
+                encryptor.decrypt((String) entry.getValue())
+            );
+            availableApplications.add(application);
         }
     }
 
@@ -104,45 +122,86 @@ public class PasswordManager
     {
         Preconditions.checkNotNull(applicationName, "applicationName cannot be null.");
 
-        return passwordsByApplication.containsKey(applicationName);
+        passwordsLock.readLock().lock();
+        try
+        {
+            return passwordsByApplication.containsKey(applicationName);
+        }
+        finally
+        {
+            passwordsLock.readLock().unlock();
+        }
     }
 
-    public String getPassword(String applicationName, String masterPassword)
+    public String getPassword(String applicationName)
         throws EncryptionOperationNotPossibleException
     {
         Preconditions.checkNotNull(applicationName, "applicationName cannot be null.");
-        Preconditions.checkNotNull(masterPassword, "masterPassword cannot be null.");
 
-        StandardPBEStringEncryptor passwordEncryptor = new StandardPBEStringEncryptor();
-        passwordEncryptor.setPassword(masterPassword);
-
-        return passwordEncryptor.decrypt(passwordsByApplication.getProperty(applicationName));
+        passwordsLock.readLock().lock();
+        try
+        {
+            return passwordsByApplication.get(applicationName);
+        }
+        finally
+        {
+            passwordsLock.readLock().unlock();
+        }
     }
 
-    public void generatePassword(String applicationName, String masterPassword)
+    public void generatePassword(String applicationName)
         throws EncryptionOperationNotPossibleException
     {
         Preconditions.checkNotNull(applicationName, "applicationName cannot be null.");
-        Preconditions.checkNotNull(masterPassword, "masterPassword cannot be null.");
 
-        StandardPBEStringEncryptor passwordEncryptor = new StandardPBEStringEncryptor();
-        passwordEncryptor.setPassword(masterPassword);
-
-        passwordsByApplication.setProperty(applicationName,
-            passwordEncryptor.encrypt(passwordGenerator.generatePassword()));
-        availableApplications.add(applicationName);
-
-        executorService.submit(new StorePasswordTask());
+        passwordsLock.writeLock().lock();
+        try
+        {
+            passwordsByApplication.put(applicationName, passwordGenerator.generatePassword());
+            availableApplications.add(applicationName);
+            executorService.submit(new StorePasswordTask());
+        }
+        finally
+        {
+            passwordsLock.writeLock().unlock();
+        }
     }
 
     public void deletePassword(String applicationName)
     {
         Preconditions.checkNotNull(applicationName, "applicationName cannot be null.");
 
-        passwordsByApplication.remove(applicationName);
-        availableApplications.remove(applicationName);
+        passwordsLock.writeLock().lock();
+        try
+        {
 
-        executorService.submit(new StorePasswordTask());
+            passwordsByApplication.remove(applicationName);
+            availableApplications.remove(applicationName);
+            executorService.submit(new StorePasswordTask());
+        }
+        finally
+        {
+            passwordsLock.writeLock().unlock();
+        }
+    }
+
+    public void changeMasterPassword(String newMasterPassword)
+    {
+        Preconditions.checkNotNull(newMasterPassword, "newMasterPassword cannot be null.");
+
+        passwordsLock.readLock().lock();
+        try
+        {
+            // Cannot set the password of an encryptor after it's been created,
+            // so need to create a new one here instead.
+            encryptor = new StandardPBEStringEncryptor();
+            encryptor.setPassword(newMasterPassword);
+            executorService.submit(new StorePasswordTask());
+        }
+        finally
+        {
+            passwordsLock.readLock().unlock();
+        }
     }
 
     private final class StorePasswordTask implements Runnable
@@ -150,10 +209,20 @@ public class PasswordManager
         @Override
         public void run()
         {
+            passwordsLock.readLock().lock();
             try
             {
+                Properties encryptedFileContents = new Properties();
+                for (Map.Entry<String, String> entry : passwordsByApplication.entrySet())
+                {
+                    encryptedFileContents.setProperty(
+                        encryptor.encrypt(entry.getKey()),
+                        encryptor.encrypt(entry.getValue())
+                    );
+                }
+
                 FileOutputStream fos = new FileOutputStream(passwordFile);
-                passwordsByApplication.store(fos, "PasswordsByFile");
+                encryptedFileContents.store(fos, "PasswordsByFile");
                 fos.flush();
                 fos.close();
                 LOGGER.info("Encrypted passwords saved to file.");
@@ -162,6 +231,10 @@ public class PasswordManager
             {
                 // FIXME this...
                 LOGGER.warn("Error storing password in file...", e);
+            }
+            finally
+            {
+                passwordsLock.readLock().unlock();
             }
         }
     }
