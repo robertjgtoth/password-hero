@@ -66,90 +66,86 @@ public class ApplicationController extends Application
     {
         PasswordDialog masterPasswordDialog = new PasswordDialog();
         masterPasswordDialog.setHeaderText("Enter master password");
-
-        Optional<String> masterPassword;
-        do
+        Optional<String> masterPassword = masterPasswordDialog.showAndWait();
+        if (masterPassword.isPresent())
         {
-            masterPassword = masterPasswordDialog.showAndWait();
-        }
-        while (!masterPassword.isPresent());
-
-        try
-        {
-            passwordManager = new PasswordManager(FILE_LOCATION, masterPassword.get());
-
-            AnchorPane root = new AnchorPane();
-            root.setPrefWidth(MIN_APPLICATION_WIDTH);
-            root.setMinWidth(MIN_APPLICATION_WIDTH);
-            root.setPrefHeight(MIN_APPLICATION_HEIGHT);
-            root.setMinHeight(MIN_APPLICATION_HEIGHT);
-
-            // FIXME: This ListView is sometimes not rendering properly when items
-            //        are deleted. Gotta figure out what's going on there.
-            final ListView<String> applicationPasswords =
-                new ListView<>(passwordManager.getAvailableApplications());
-            applicationPasswords.setCellFactory(param -> new ApplicationPasswordCell());
-
-            AnchorPane.setTopAnchor(applicationPasswords, 0.0);
-            AnchorPane.setLeftAnchor(applicationPasswords, 0.0);
-            AnchorPane.setRightAnchor(applicationPasswords, 0.0);
-            root.getChildren().add(applicationPasswords);
-
-            Button addNewApplication = new Button("Add New Application");
-            addNewApplication.setOnAction(event ->
+            try
             {
-                TextInputDialog textInputDialog = new TextInputDialog();
-                textInputDialog.setTitle("New application");
-                textInputDialog.setHeaderText("Add new application");
-                textInputDialog.setContentText("Enter application name");
+                passwordManager = new PasswordManager(FILE_LOCATION, masterPassword.get());
 
-                Optional<String> newApplication = textInputDialog.showAndWait();
-                if (newApplication.isPresent())
+                AnchorPane root = new AnchorPane();
+                root.setPrefWidth(MIN_APPLICATION_WIDTH);
+                root.setMinWidth(MIN_APPLICATION_WIDTH);
+                root.setPrefHeight(MIN_APPLICATION_HEIGHT);
+                root.setMinHeight(MIN_APPLICATION_HEIGHT);
+
+                final ListView<String> applicationPasswords =
+                    new ListView<>(passwordManager.getAvailableApplications());
+                applicationPasswords.setCellFactory(param -> new ApplicationPasswordCell());
+
+                AnchorPane.setTopAnchor(applicationPasswords, 0.0);
+                AnchorPane.setLeftAnchor(applicationPasswords, 0.0);
+                AnchorPane.setRightAnchor(applicationPasswords, 0.0);
+                root.getChildren().add(applicationPasswords);
+
+                Button addNewApplication = new Button("Add New Application");
+                addNewApplication.setOnAction(event ->
                 {
-                    if (!passwordManager.hasPassword(newApplication.get()))
-                    {
-                        passwordManager.generatePassword(newApplication.get());
-                        showApplicationPassword(newApplication.get());
-                    }
-                    else
-                    {
-                        Alert alert = new Alert(Alert.AlertType.WARNING,
-                            "Application already registered!", ButtonType.OK);
-                        alert.showAndWait();
-                    }
-                }
-            });
+                    TextInputDialog textInputDialog = new TextInputDialog();
+                    textInputDialog.setTitle("New application");
+                    textInputDialog.setHeaderText("Add new application");
+                    textInputDialog.setContentText("Enter application name");
 
-            AnchorPane.setLeftAnchor(addNewApplication, 0.0);
-            AnchorPane.setBottomAnchor(addNewApplication, 0.0);
-            root.getChildren().add(addNewApplication);
+                    Optional<String> newApplication = textInputDialog.showAndWait();
+                    if (newApplication.isPresent())
+                    {
+                        if (!passwordManager.hasPassword(newApplication.get()))
+                        {
+                            passwordManager.generatePassword(newApplication.get());
+                            showApplicationPassword(newApplication.get());
+                        }
+                        else
+                        {
+                            Alert alert = new Alert(Alert.AlertType.WARNING,
+                                "Application already registered!", ButtonType.OK);
+                            alert.showAndWait();
+                        }
+                    }
+                });
 
-            Button changeMasterPassword = new Button("Change Master Password");
-            changeMasterPassword.setOnAction(event ->
+                AnchorPane.setLeftAnchor(addNewApplication, 0.0);
+                AnchorPane.setBottomAnchor(addNewApplication, 0.0);
+                root.getChildren().add(addNewApplication);
+
+                Button changeMasterPassword = new Button("Change Master Password");
+                changeMasterPassword.setOnAction(event ->
+                {
+                    PasswordDialog newPasswordDialog = new PasswordDialog();
+                    newPasswordDialog.setHeaderText("Enter new master password");
+                    Optional<String> newMasterPassword = newPasswordDialog.showAndWait();
+                    if (newMasterPassword.isPresent())
+                    {
+                        passwordManager.changeMasterPassword(newMasterPassword.get());
+                    }
+                });
+
+                AnchorPane.setRightAnchor(changeMasterPassword, 0.0);
+                AnchorPane.setBottomAnchor(changeMasterPassword, 0.0);
+                root.getChildren().add(changeMasterPassword);
+
+                primaryStage.setTitle("Password Hero");
+                primaryStage.setScene(new Scene(root, MIN_APPLICATION_WIDTH, MIN_APPLICATION_HEIGHT));
+                primaryStage.setMinWidth(MIN_APPLICATION_WIDTH);
+                primaryStage.setMinHeight(MIN_APPLICATION_HEIGHT);
+                primaryStage.show();
+
+                // FIXME: Why does the application not shut down properly?
+            }
+            catch (EncryptionOperationNotPossibleException e)
             {
-                PasswordDialog newPasswordDialog = new PasswordDialog();
-                newPasswordDialog.setHeaderText("Enter new master password");
-                Optional<String> newMasterPassword = newPasswordDialog.showAndWait();
-                if (newMasterPassword.isPresent())
-                {
-                    passwordManager.changeMasterPassword(newMasterPassword.get());
-                }
-            });
-
-            AnchorPane.setRightAnchor(changeMasterPassword, 0.0);
-            AnchorPane.setBottomAnchor(changeMasterPassword, 0.0);
-            root.getChildren().add(changeMasterPassword);
-
-            primaryStage.setTitle("Password Hero");
-            primaryStage.setScene(new Scene(root, MIN_APPLICATION_WIDTH, MIN_APPLICATION_HEIGHT));
-            primaryStage.setMinWidth(MIN_APPLICATION_WIDTH);
-            primaryStage.setMinHeight(MIN_APPLICATION_HEIGHT);
-            primaryStage.show();
-        }
-        catch (EncryptionOperationNotPossibleException e)
-        {
-            Alert alert = new Alert(Alert.AlertType.ERROR, "Invalid password!", ButtonType.OK);
-            alert.showAndWait();
+                Alert alert = new Alert(Alert.AlertType.ERROR, "Invalid password!", ButtonType.OK);
+                alert.showAndWait();
+            }
         }
     }
 
