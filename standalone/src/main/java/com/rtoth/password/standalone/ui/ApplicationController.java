@@ -21,10 +21,13 @@
  */
 package com.rtoth.password.standalone.ui;
 
+import com.google.common.base.Preconditions;
 import com.rtoth.password.core.PasswordManager;
 
 import org.jasypt.exceptions.EncryptionOperationNotPossibleException;
 
+import java.io.File;
+import java.io.IOException;
 import java.util.Optional;
 
 import javafx.application.Application;
@@ -41,6 +44,7 @@ import javafx.scene.control.TextInputDialog;
 import javafx.scene.layout.AnchorPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
+import javafx.scene.text.Font;
 import javafx.stage.Stage;
 
 /**
@@ -54,9 +58,8 @@ public class ApplicationController extends Application
     /** Minimum height of the application. */
     private static final double MIN_APPLICATION_HEIGHT = 250.0;
 
-    /** Static location of the passwords file. */
-    // FIXME: Make this configurable
-    private static final String FILE_LOCATION = "C:\\Users\\rtoth\\AppData\\Local\\PasswordHero\\encrypted.gpg";
+    /** Static location of the passwords file in the user's home directory. */
+    private static final String FILE_SUFFIX = ".password-hero" + File.separator + "encrypted.gpg";
 
     /** Manages all password-related operations. */
     private PasswordManager passwordManager;
@@ -64,89 +67,186 @@ public class ApplicationController extends Application
     @Override
     public void start(Stage primaryStage) throws Exception
     {
+        Optional<File> passwordFile = getPasswordFileLocation();
+        if (passwordFile.isPresent())
+        {
+            Optional<String> masterPassword;
+            // First time login -- perform initial setup and whatnot
+            if (!passwordFile.get().exists())
+            {
+                masterPassword = performInitialSetup(passwordFile.get());
+            }
+            else
+            {
+                PasswordDialog masterPasswordDialog = new PasswordDialog();
+                masterPasswordDialog.setHeaderText("Enter master password");
+                masterPassword = masterPasswordDialog.showAndWait();
+            }
+
+            if (masterPassword.isPresent())
+            {
+                try
+                {
+                    passwordManager = new PasswordManager(passwordFile.get(), masterPassword.get());
+
+                    Font.loadFont(
+                        ApplicationController.class.getResource("/fonts/fontawesome-webfont.ttf").toExternalForm(),
+                        12);
+
+
+                    AnchorPane root = new AnchorPane();
+                    root.setPrefWidth(MIN_APPLICATION_WIDTH);
+                    root.setMinWidth(MIN_APPLICATION_WIDTH);
+                    root.setPrefHeight(MIN_APPLICATION_HEIGHT);
+                    root.setMinHeight(MIN_APPLICATION_HEIGHT);
+
+                    final ListView<String> applicationPasswords =
+                        new ListView<>(passwordManager.getAvailableApplications());
+                    applicationPasswords.setCellFactory(param -> new ApplicationPasswordCell());
+
+                    AnchorPane.setTopAnchor(applicationPasswords, 0.0);
+                    AnchorPane.setLeftAnchor(applicationPasswords, 0.0);
+                    AnchorPane.setRightAnchor(applicationPasswords, 0.0);
+                    root.getChildren().add(applicationPasswords);
+
+                    Button addNewApplication = new Button("Add New Application");
+                    addNewApplication.setOnAction(event ->
+                    {
+                        TextInputDialog textInputDialog = new TextInputDialog();
+                        textInputDialog.setTitle("New application");
+                        textInputDialog.setHeaderText("Add new application");
+                        textInputDialog.setContentText("Enter application name");
+
+                        Optional<String> newApplication = textInputDialog.showAndWait();
+                        if (newApplication.isPresent())
+                        {
+                            if (!passwordManager.hasPassword(newApplication.get()))
+                            {
+                                passwordManager.generatePassword(newApplication.get());
+                                showApplicationPassword(newApplication.get());
+                            }
+                            else
+                            {
+                                Alert alert = new Alert(Alert.AlertType.WARNING,
+                                    "Application already registered!", ButtonType.OK);
+                                alert.showAndWait();
+                            }
+                        }
+                    });
+
+                    AnchorPane.setLeftAnchor(addNewApplication, 0.0);
+                    AnchorPane.setBottomAnchor(addNewApplication, 0.0);
+                    root.getChildren().add(addNewApplication);
+
+                    Button changeMasterPassword = new Button("Change Master Password");
+                    changeMasterPassword.setOnAction(event ->
+                    {
+                        PasswordDialog newPasswordDialog = new PasswordDialog();
+                        newPasswordDialog.setHeaderText("Enter new master password");
+                        Optional<String> newMasterPassword = newPasswordDialog.showAndWait();
+                        if (newMasterPassword.isPresent())
+                        {
+                            passwordManager.changeMasterPassword(newMasterPassword.get());
+                        }
+                    });
+
+                    AnchorPane.setRightAnchor(changeMasterPassword, 0.0);
+                    AnchorPane.setBottomAnchor(changeMasterPassword, 0.0);
+                    root.getChildren().add(changeMasterPassword);
+
+                    Scene scene = new Scene(root, MIN_APPLICATION_WIDTH, MIN_APPLICATION_HEIGHT);
+                    scene.getStylesheets().add(
+                        ApplicationController.class.getResource("/css/application.css").toExternalForm());
+
+                    primaryStage.setTitle("Password Hero");
+                    primaryStage.setScene(scene);
+                    primaryStage.setMinWidth(MIN_APPLICATION_WIDTH);
+                    primaryStage.setMinHeight(MIN_APPLICATION_HEIGHT);
+                    primaryStage.show();
+
+                    // FIXME: Why does the application not shut down properly?
+                }
+                catch (EncryptionOperationNotPossibleException e)
+                {
+                    Alert alert = new Alert(Alert.AlertType.ERROR, "Invalid password!", ButtonType.OK);
+                    alert.showAndWait();
+                }
+            }
+        }
+        else
+        {
+            Alert alert = new Alert(Alert.AlertType.ERROR, "Error retrieving user home directory.", ButtonType.OK);
+            alert.showAndWait();
+        }
+    }
+
+    /**
+     * Get the location of the password file for the current user.
+     * @return An {@link Optional} containing the expected password file location for the current user, or
+     *         {@link Optional#empty()} if there is a problem accessing the user's home directory.
+     */
+    private Optional<File> getPasswordFileLocation()
+    {
+        Optional<File> passwordFile = Optional.empty();
+
+        String userHome = System.getProperty("user.home");
+        if (userHome != null)
+        {
+            passwordFile = Optional.of(
+                new File(userHome + File.separator + FILE_SUFFIX)
+            );
+        }
+
+        return passwordFile;
+    }
+
+    /**
+     * Perform initial application setup for users that launch for the first time.
+     *
+     * @param passwordFile File which will be created if necessary to house encrypted passwords. Cannot be {@code null}
+     *                     and must not exist ({@link File#exists()}) .
+     * @return An {@link Optional} containing the user's initial plaintext master password if setup is successful,
+     *         {@link Optional#empty()} otherwise. Never {@code null}.
+     *
+     * @throws NullPointerException if {@code passwordFile} is {@code null}.
+      */
+    private Optional<String> performInitialSetup(File passwordFile)
+    {
+        Preconditions.checkNotNull(passwordFile, "passwordFile cannot be null.");
+        Preconditions.checkArgument(!passwordFile.exists(), "passwordFile already exists.");
+
         PasswordDialog masterPasswordDialog = new PasswordDialog();
-        masterPasswordDialog.setHeaderText("Enter master password");
+        masterPasswordDialog.setTitle("Password Hero");
+        masterPasswordDialog.setHeaderText(
+            "Welcome to password hero!\nPlease enter a master password to get started.");
         Optional<String> masterPassword = masterPasswordDialog.showAndWait();
         if (masterPassword.isPresent())
         {
+            boolean creationResult = true;
             try
             {
-                passwordManager = new PasswordManager(FILE_LOCATION, masterPassword.get());
-
-                AnchorPane root = new AnchorPane();
-                root.setPrefWidth(MIN_APPLICATION_WIDTH);
-                root.setMinWidth(MIN_APPLICATION_WIDTH);
-                root.setPrefHeight(MIN_APPLICATION_HEIGHT);
-                root.setMinHeight(MIN_APPLICATION_HEIGHT);
-
-                final ListView<String> applicationPasswords =
-                    new ListView<>(passwordManager.getAvailableApplications());
-                applicationPasswords.setCellFactory(param -> new ApplicationPasswordCell());
-
-                AnchorPane.setTopAnchor(applicationPasswords, 0.0);
-                AnchorPane.setLeftAnchor(applicationPasswords, 0.0);
-                AnchorPane.setRightAnchor(applicationPasswords, 0.0);
-                root.getChildren().add(applicationPasswords);
-
-                Button addNewApplication = new Button("Add New Application");
-                addNewApplication.setOnAction(event ->
+                File parent = passwordFile.getParentFile();
+                if (parent != null && !parent.exists())
                 {
-                    TextInputDialog textInputDialog = new TextInputDialog();
-                    textInputDialog.setTitle("New application");
-                    textInputDialog.setHeaderText("Add new application");
-                    textInputDialog.setContentText("Enter application name");
-
-                    Optional<String> newApplication = textInputDialog.showAndWait();
-                    if (newApplication.isPresent())
-                    {
-                        if (!passwordManager.hasPassword(newApplication.get()))
-                        {
-                            passwordManager.generatePassword(newApplication.get());
-                            showApplicationPassword(newApplication.get());
-                        }
-                        else
-                        {
-                            Alert alert = new Alert(Alert.AlertType.WARNING,
-                                "Application already registered!", ButtonType.OK);
-                            alert.showAndWait();
-                        }
-                    }
-                });
-
-                AnchorPane.setLeftAnchor(addNewApplication, 0.0);
-                AnchorPane.setBottomAnchor(addNewApplication, 0.0);
-                root.getChildren().add(addNewApplication);
-
-                Button changeMasterPassword = new Button("Change Master Password");
-                changeMasterPassword.setOnAction(event ->
-                {
-                    PasswordDialog newPasswordDialog = new PasswordDialog();
-                    newPasswordDialog.setHeaderText("Enter new master password");
-                    Optional<String> newMasterPassword = newPasswordDialog.showAndWait();
-                    if (newMasterPassword.isPresent())
-                    {
-                        passwordManager.changeMasterPassword(newMasterPassword.get());
-                    }
-                });
-
-                AnchorPane.setRightAnchor(changeMasterPassword, 0.0);
-                AnchorPane.setBottomAnchor(changeMasterPassword, 0.0);
-                root.getChildren().add(changeMasterPassword);
-
-                primaryStage.setTitle("Password Hero");
-                primaryStage.setScene(new Scene(root, MIN_APPLICATION_WIDTH, MIN_APPLICATION_HEIGHT));
-                primaryStage.setMinWidth(MIN_APPLICATION_WIDTH);
-                primaryStage.setMinHeight(MIN_APPLICATION_HEIGHT);
-                primaryStage.show();
-
-                // FIXME: Why does the application not shut down properly?
+                    creationResult = parent.mkdirs();
+                }
+                creationResult &= passwordFile.createNewFile();
             }
-            catch (EncryptionOperationNotPossibleException e)
+            catch (IOException ioe)
             {
-                Alert alert = new Alert(Alert.AlertType.ERROR, "Invalid password!", ButtonType.OK);
+                creationResult = false;
+            }
+
+            if (!creationResult)
+            {
+                Alert alert = new Alert(Alert.AlertType.ERROR,
+                    "Unable to create password file store at " + passwordFile.getAbsolutePath(), ButtonType.OK);
                 alert.showAndWait();
+                masterPassword = Optional.empty();
             }
         }
+
+        return masterPassword;
     }
 
     /**
@@ -203,10 +303,10 @@ public class ApplicationController extends Application
 
                 HBox controlsHBox = new HBox(5);
 
-                Button show = new Button("show");
+                Button show = FontAwesomeUtility.createIconButton(FontAwesomeIcon.OPEN_EYE);
                 show.setOnAction(event -> showApplicationPassword(item));
 
-                Button change = new Button("change");
+                Button change = FontAwesomeUtility.createIconButton(FontAwesomeIcon.REFRESH);
                 change.setOnAction(event ->
                 {
                     Alert confirmation = new Alert(Alert.AlertType.CONFIRMATION,
@@ -221,7 +321,7 @@ public class ApplicationController extends Application
                     }
                 });
 
-                Button delete = new Button("delete");
+                Button delete = FontAwesomeUtility.createIconButton(FontAwesomeIcon.TRASH);
                 delete.setOnAction(event ->
                 {
                     Alert confirmation = new Alert(Alert.AlertType.CONFIRMATION,

@@ -30,9 +30,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.ExecutorService;
@@ -69,8 +69,8 @@ public class PasswordManager
     /** Locks access to {@code #passwordsByApplication}. */
     private final ReadWriteLock passwordsLock = new ReentrantReadWriteLock();
 
-    /** File used to store encrypted passwords. */
-    private final File passwordFile;
+    /** Datastore used to store encrypted passwords. */
+    private final EncryptedPasswordDatastore passwordDatastore;
 
     /** Used to perform encryption and decryption. */
     private StandardPBEStringEncryptor encryptor;
@@ -78,7 +78,8 @@ public class PasswordManager
     /**
      * Create a new {@link PasswordManager} using the provided file path and master password.
      *
-     * @param filePath File path where encrypted passwords are stored. Cannot be {@code null}.
+     * @param passwordFile File where encrypted passwords are stored. Cannot be {@code null}, and must be an existing
+     *                     regular file with read and write permissions.
      * @param masterPassword Plaintext master password to use. This should be the password previously used to
      *                       encrypt the passwords stored in {@code filePath}, or a new master password if there
      *                       are no passwords stored yet. Cannot be {@code null}.
@@ -86,23 +87,17 @@ public class PasswordManager
      * @throws EncryptionOperationNotPossibleException if there are existing passwords in the file, and the provided
      *         {@code masterPassword} is not correct.
      * @throws IOException if there is some IO issue reading the provided {@code filePath}.
+     * @throws IllegalArgumentException if {@code passwordFile} is not an existing regular file with read and write
+     *         permissions.
      * @throws NullPointerException if {@code filePath} or {@code masterPassword} is {@code null}.
      */
-    public PasswordManager(String filePath, String masterPassword)
+    public PasswordManager(File passwordFile, String masterPassword)
         throws EncryptionOperationNotPossibleException, IOException
     {
-        Preconditions.checkNotNull(filePath, "passwordFile cannot be null.");
+        Preconditions.checkNotNull(passwordFile, "passwordDatastore cannot be null.");
         Preconditions.checkNotNull(masterPassword, "masterPassword cannot be null.");
 
-        passwordFile = new File(filePath);
-
-        if (!passwordFile.exists() || passwordFile.isDirectory() ||
-            !passwordFile.canRead() || !passwordFile.canWrite())
-        {
-            String message = "Password file is not a regular file with rw permissions: " + filePath;
-            LOGGER.warn(message);
-            throw new IllegalArgumentException(message);
-        }
+        passwordDatastore = new FileBasedEncryptedPasswordDatastore(passwordFile);
 
         encryptor = new StandardPBEStringEncryptor();
         encryptor.setPassword(masterPassword);
@@ -120,9 +115,9 @@ public class PasswordManager
     private void loadExistingPasswords() throws EncryptionOperationNotPossibleException, IOException
     {
         Properties encryptedFileContents = new Properties();
-        FileInputStream fis = new FileInputStream(passwordFile);
-        encryptedFileContents.load(fis);
-        fis.close();
+        InputStream in = passwordDatastore.getInputStream();
+        encryptedFileContents.load(in);
+        in.close();
         for (Map.Entry<Object, Object> entry : encryptedFileContents.entrySet())
         {
             String application = encryptor.decrypt((String) entry.getKey());
@@ -330,10 +325,10 @@ public class PasswordManager
                     );
                 }
 
-                FileOutputStream fos = new FileOutputStream(passwordFile);
-                encryptedFileContents.store(fos, "PasswordsByFile");
-                fos.flush();
-                fos.close();
+                OutputStream out = passwordDatastore.getOutputStream();
+                encryptedFileContents.store(out, null); // null comments
+                out.flush();
+                out.close();
                 LOGGER.info("Encrypted passwords saved to file.");
             }
             catch (Exception e)
