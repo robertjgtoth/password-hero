@@ -13,12 +13,10 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 
 /**
- * FIXME: docs
+ * Dialog utility to prompt the user for a password and mask what they're typing.
  */
 public class PasswordDialog extends Dialog<String>
 {
-    private PasswordField passwordField;
-
     public PasswordDialog() {
         setTitle("Password");
         setHeaderText("Enter password.");
@@ -26,7 +24,7 @@ public class PasswordDialog extends Dialog<String>
         ButtonType passwordButtonType = new ButtonType("OK", ButtonBar.ButtonData.OK_DONE);
         getDialogPane().getButtonTypes().addAll(passwordButtonType, ButtonType.CANCEL);
 
-        passwordField = new PasswordField();
+        PasswordField passwordField = new PasswordField();
         passwordField.setPromptText("Password");
 
         HBox hBox = new HBox();
@@ -37,7 +35,7 @@ public class PasswordDialog extends Dialog<String>
 
         getDialogPane().setContent(hBox);
 
-        Platform.runLater(() -> passwordField.requestFocus());
+        Platform.runLater(passwordField::requestFocus);
 
         setResultConverter(dialogButton -> {
             if (dialogButton == passwordButtonType) {
@@ -45,9 +43,5 @@ public class PasswordDialog extends Dialog<String>
             }
             return null;
         });
-    }
-
-    public PasswordField getPasswordField() {
-        return passwordField;
     }
 }

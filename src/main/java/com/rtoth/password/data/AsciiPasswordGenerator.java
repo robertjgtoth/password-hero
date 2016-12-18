@@ -26,26 +26,39 @@ import com.google.common.base.Preconditions;
 import java.security.SecureRandom;
 
 /**
- * FIXME: docs
+ * {@link RandomPasswordGenerator} which generates ASCII passwords only.
  */
-public class AsciiPasswordGenerator implements PasswordGenerator
+public class AsciiPasswordGenerator implements RandomPasswordGenerator
 {
-    // !
+    /** Absolute minimum password length. */
+    public static final int ABSOLUTE_MIN_CHARS = 15;
+
+    /** Absolute maximum password length. */
+    public static final int ABSOLUTE_MAX_CHARS = 100;
+
+    /** Minimum printable ASCII character -- "!" */
     private static final int ASCII_MIN = 33;
 
-    // ~
+    /** Maximum printable ASCII character -- "~" */
     private static final int ASCII_MAX = 126;
 
-    private static final int ABSOLUTE_MIN_CHARS = 15;
-
-    private static final int ABSOLUTE_MAX_CHARS = 100;
-
+    /** Used to generate random numbers. */
     private final SecureRandom random = new SecureRandom();
 
+    /** Minimum password length to use. */
     private final int minCharacters;
 
+    /** Maximum password length to use. */
     private final int maxCharacters;
 
+    /**
+     * Create a new {@link AsciiPasswordGenerator}.
+     *
+     * @param minCharacters Minimum password length. Must be &lt; {@code maxCharacters} and &ge;
+     *                      {@link #ABSOLUTE_MIN_CHARS}.
+     * @param maxCharacters MAximum password length. Must be &gt; {@code minCharacters} and &le;
+     *                      {@link #ABSOLUTE_MAX_CHARS}.
+     */
     public AsciiPasswordGenerator(int minCharacters, int maxCharacters)
     {
         Preconditions.checkArgument(minCharacters < maxCharacters,
@@ -72,11 +85,23 @@ public class AsciiPasswordGenerator implements PasswordGenerator
         return passwordBuilder.toString();
     }
 
+    /**
+     * Get a random printable ASCII character.
+     *
+     * @return A random printable ASCII character.
+     */
     private char randomAsciiCharacter()
     {
         return (char) randomInRange(ASCII_MIN, ASCII_MAX);
     }
 
+    /**
+     * Get a random integer in the provided range, inclusive.
+     *
+     * @param minInclusive Range lower bound.
+     * @param maxInclusive Range upper bound.
+     * @return A random integer in the provided range, inclusive.
+     */
     private int randomInRange(int minInclusive, int maxInclusive)
     {
         return random.nextInt((maxInclusive - minInclusive) + 1) + minInclusive;

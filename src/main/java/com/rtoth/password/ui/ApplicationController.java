@@ -29,7 +29,6 @@ import java.util.Optional;
 
 import javafx.application.Application;
 import javafx.geometry.Insets;
-import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
@@ -45,26 +44,33 @@ import javafx.scene.layout.Priority;
 import javafx.stage.Stage;
 
 /**
- * FIXME: docs
+ * Main application entry point.
  */
 public class ApplicationController extends Application
 {
+    /** Minimum width of the application. */
     private static final double MIN_APPLICATION_WIDTH = 300.0;
 
+    /** Minimum height of the application. */
     private static final double MIN_APPLICATION_HEIGHT = 250.0;
 
+    /** Static location of the passwords file. */
     // FIXME: Make this configurable
     private static final String FILE_LOCATION = "C:\\Users\\rtoth\\AppData\\Local\\PasswordHero\\encrypted.gpg";
 
+    /** Manages all password-related operations. */
     private PasswordManager passwordManager;
 
     @Override
     public void start(Stage primaryStage) throws Exception
     {
+        PasswordDialog masterPasswordDialog = new PasswordDialog();
+        masterPasswordDialog.setHeaderText("Enter master password");
+
         Optional<String> masterPassword;
         do
         {
-            masterPassword = getMasterPassword();
+            masterPassword = masterPasswordDialog.showAndWait();
         }
         while (!masterPassword.isPresent());
 
@@ -107,7 +113,8 @@ public class ApplicationController extends Application
                     }
                     else
                     {
-                        Alert alert = new Alert(Alert.AlertType.WARNING, "Application already registered!", ButtonType.OK);
+                        Alert alert = new Alert(Alert.AlertType.WARNING,
+                            "Application already registered!", ButtonType.OK);
                         alert.showAndWait();
                     }
                 }
@@ -120,9 +127,9 @@ public class ApplicationController extends Application
             Button changeMasterPassword = new Button("Change Master Password");
             changeMasterPassword.setOnAction(event ->
             {
-                PasswordDialog passwordDialog = new PasswordDialog();
-                passwordDialog.setHeaderText("Enter new master password");
-                Optional<String> newMasterPassword = passwordDialog.showAndWait();
+                PasswordDialog newPasswordDialog = new PasswordDialog();
+                newPasswordDialog.setHeaderText("Enter new master password");
+                Optional<String> newMasterPassword = newPasswordDialog.showAndWait();
                 if (newMasterPassword.isPresent())
                 {
                     passwordManager.changeMasterPassword(newMasterPassword.get());
@@ -146,16 +153,16 @@ public class ApplicationController extends Application
         }
     }
 
-    private Optional<String> getMasterPassword()
-    {
-        PasswordDialog passwordDialog = new PasswordDialog();
-        passwordDialog.setHeaderText("Enter master password");
-        return passwordDialog.showAndWait();
-    }
-
+    /**
+     * Show the current plaintext password for the provided application.
+     *
+     * @param application Application for which to show the current plaintext password. Cannot be {@code null}.
+     *
+     * @throws NullPointerException if {@code application} is {@code null}.
+     */
     private void showApplicationPassword(String application)
     {
-        String savedPassword = passwordManager.getPassword(application);
+        String savedPassword = passwordManager.getPlaintextPassword(application);
         if (savedPassword != null)
         {
             Alert alert = new Alert(Alert.AlertType.INFORMATION, savedPassword, ButtonType.OK);
@@ -172,15 +179,14 @@ public class ApplicationController extends Application
 
             alert.getDialogPane().setContent(hBox);
 
+            // FIXME: Figure out how to put this on a timer so it auto-closes after like 30 seconds.
             alert.showAndWait();
         }
     }
 
-    private void deleteApplicationPassword(String application)
-    {
-        passwordManager.deletePassword(application);
-    }
-
+    /**
+     * List cell for a single application which contains controls to show, update, and delete its password.
+     */
     private final class ApplicationPasswordCell extends ListCell<String>
     {
         @Override
@@ -229,7 +235,7 @@ public class ApplicationController extends Application
                     Optional<ButtonType> result = confirmation.showAndWait();
                     if (result.isPresent() && result.get().equals(ButtonType.YES))
                     {
-                        deleteApplicationPassword(item);
+                        passwordManager.deletePassword(item);
                     }
                 });
 

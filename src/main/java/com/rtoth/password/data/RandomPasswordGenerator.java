@@ -22,9 +22,14 @@
 package com.rtoth.password.data;
 
 /**
- * FIXME: docs
+ * Generates random string passwords.
  */
-public interface PasswordGenerator
+public interface RandomPasswordGenerator
 {
+    /**
+     * Generate a new random password.
+     *
+     * @return A new random password. Never {@code null}.
+     */
     String generatePassword();
 }

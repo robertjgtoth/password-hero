@@ -44,30 +44,52 @@ import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 
 /**
- * FIXME: docs
+ * Manages CRUD operations on application passwords, including
+ * storage/retrieval of encrypted data from the filesystem.
  */
 public class PasswordManager
 {
     /** Logger for this class. */
     private static final Logger LOGGER = LoggerFactory.getLogger(PasswordManager.class);
 
+    /** Used to do file IO in the background. */
     private final ExecutorService executorService = Executors.newSingleThreadExecutor();
 
+    /** Generates new random passwords. */
     // FIXME: Make this range configurable or something.
-    private final PasswordGenerator passwordGenerator = new AsciiPasswordGenerator(20, 30);
+    private final RandomPasswordGenerator passwordGenerator = new AsciiPasswordGenerator(20, 30);
 
+    /** Observable list containing all applications with a password stored. */
     private final ObservableList<String> availableApplications = FXCollections.observableArrayList();
 
+    /** Map of plaintext passwords by application. */
+    // FIXME: Figure out a way to make this not plaintext.
     private final Map<String, String> passwordsByApplication = Maps.newHashMap();
 
+    /** Locks access to {@code #passwordsByApplication}. */
     private final ReadWriteLock passwordsLock = new ReentrantReadWriteLock();
-
-    private StandardPBEStringEncryptor encryptor;
 
     /** File used to store encrypted passwords. */
     private final File passwordFile;
 
+    /** Used to perform encryption and decryption. */
+    private StandardPBEStringEncryptor encryptor;
+
+    /**
+     * Create a new {@link PasswordManager} using the provided file path and master password.
+     *
+     * @param filePath File path where encrypted passwords are stored. Cannot be {@code null}.
+     * @param masterPassword Plaintext master password to use. This should be the password previously used to
+     *                       encrypt the passwords stored in {@code filePath}, or a new master password if there
+     *                       are no passwords stored yet. Cannot be {@code null}.
+     *
+     * @throws EncryptionOperationNotPossibleException if there are existing passwords in the file, and the provided
+     *         {@code masterPassword} is not correct.
+     * @throws IOException if there is some IO issue reading the provided {@code filePath}.
+     * @throws NullPointerException if {@code filePath} or {@code masterPassword} is {@code null}.
+     */
     public PasswordManager(String filePath, String masterPassword)
+        throws EncryptionOperationNotPossibleException, IOException
     {
         Preconditions.checkNotNull(filePath, "passwordFile cannot be null.");
         Preconditions.checkNotNull(masterPassword, "masterPassword cannot be null.");
@@ -85,18 +107,17 @@ public class PasswordManager
         encryptor = new StandardPBEStringEncryptor();
         encryptor.setPassword(masterPassword);
 
-        try
-        {
-            loadExistingPasswords();
-        }
-        catch (IOException e)
-        {
-            LOGGER.error("Unable to load existing passwords from file.", e);
-            throw new IllegalStateException(e);
-        }
+        loadExistingPasswords();
     }
 
-    private void loadExistingPasswords() throws IOException
+    /**
+     * Load any existing encrypted passwords from the {@code passwordsFile} into memory.
+     *
+     * @throws EncryptionOperationNotPossibleException if there are existing passwords in the file, and the
+     *         {@code masterPassword} used to initialize the encryptor is not correct.
+     * @throws IOException if there is some IO issue reading the {@code passwordsFile}.
+     */
+    private void loadExistingPasswords() throws EncryptionOperationNotPossibleException, IOException
     {
         Properties encryptedFileContents = new Properties();
         FileInputStream fis = new FileInputStream(passwordFile);
@@ -113,11 +134,28 @@ public class PasswordManager
         }
     }
 
+    /**
+     * Get an observable list of all applications with passwords managed by this application.
+     * <p>
+     * As new passwords are generated for applications, or applications have their passwords deleted, this list will be
+     * updated by this class for the benefit of anyone listening.
+     *
+     * @return An observable list of all applications with passwords managed by this application. Never {@code null},
+     *         but may be empty.
+     */
     public ObservableList<String> getAvailableApplications()
     {
         return availableApplications;
     }
 
+    /**
+     * Get whether we have a stored password for the provided application.
+     *
+     * @param applicationName Application to check. Cannot be {@code null}.
+     * @return {@code true} if we have a password stored for the application, {@code false} otherwise.
+     *
+     * @throws NullPointerException if {@code applicationName} is {@code null}.
+     */
     public boolean hasPassword(String applicationName)
     {
         Preconditions.checkNotNull(applicationName, "applicationName cannot be null.");
@@ -133,8 +171,15 @@ public class PasswordManager
         }
     }
 
-    public String getPassword(String applicationName)
-        throws EncryptionOperationNotPossibleException
+    /**
+     * Get the plaintext password for the provided application.
+     *
+     * @param applicationName Application for which to get the password. Cannot be {@code null}.
+     * @return The plaintext password for the provided application, or {@code null} if there is no password stored.
+     *
+     * @throws NullPointerException if {@code applicationName} is {@code null}.
+     */
+    public String getPlaintextPassword(String applicationName)
     {
         Preconditions.checkNotNull(applicationName, "applicationName cannot be null.");
 
@@ -149,8 +194,17 @@ public class PasswordManager
         }
     }
 
+    /**
+     * Generate a new, random password for the provided application.
+     * <p>
+     * If a password is already stored for the provided application, a new one will be created and will overwrite
+     * the existing one.
+     *
+     * @param applicationName Application for which to generate and save a new password. Cannot be {@code null}.
+     *
+     * @throws NullPointerException if {@code applicationName} is {@code null}.
+     */
     public void generatePassword(String applicationName)
-        throws EncryptionOperationNotPossibleException
     {
         Preconditions.checkNotNull(applicationName, "applicationName cannot be null.");
 
@@ -158,11 +212,7 @@ public class PasswordManager
         try
         {
             passwordsByApplication.put(applicationName, passwordGenerator.generatePassword());
-            // Only add it to the list if it's not already in there
-            if (!availableApplications.contains(applicationName))
-            {
-                availableApplications.add(applicationName);
-            }
+            availableApplications.add(applicationName);
             executorService.submit(new StorePasswordTask());
         }
         finally
@@ -171,6 +221,13 @@ public class PasswordManager
         }
     }
 
+    /**
+     * Delete the password associated with the provided application.
+     *
+     * @param applicationName Application for which to delete the password. Cannot be {@code null}.
+     *
+     * @throws NullPointerException if {@code applicationName} is {@code null}.
+     */
     public void deletePassword(String applicationName)
     {
         Preconditions.checkNotNull(applicationName, "applicationName cannot be null.");
@@ -178,9 +235,47 @@ public class PasswordManager
         passwordsLock.writeLock().lock();
         try
         {
+            if (hasPassword(applicationName))
+            {
+                passwordsByApplication.remove(applicationName);
+                availableApplications.remove(applicationName);
+                executorService.submit(new StorePasswordTask());
+            }
+        }
+        finally
+        {
+            passwordsLock.writeLock().unlock();
+        }
+    }
 
-            passwordsByApplication.remove(applicationName);
-            availableApplications.remove(applicationName);
+    /**
+     * Change the provided application's password by generating a new, random password.
+     *
+     * @param applicationName Application for which to generate and save a new password. Cannot be {@code null} and
+     *                        must have an existing password.
+     *
+     * @throws IllegalArgumentException if {@code applicationName} does not have an existing password.
+     * @throws NullPointerException if {@code applicationName} is {@code null}.
+     */
+    // FIXME: Threading bug likely here if someone invokes delete before we grab the lock
+    public void changePassword(String applicationName)
+    {
+        Preconditions.checkNotNull(applicationName, "applicationName cannot be null.");
+        Preconditions.checkArgument(hasPassword(applicationName),
+            "Cannot change password for unknown application: " + applicationName);
+
+        passwordsLock.writeLock().lock();
+        try
+        {
+            String existingPassword = passwordsByApplication.get(applicationName);
+            String newPassword;
+            do
+            {
+                newPassword = passwordGenerator.generatePassword();
+            }
+            while (newPassword.equals(existingPassword));
+
+            passwordsByApplication.put(applicationName, newPassword);
             executorService.submit(new StorePasswordTask());
         }
         finally
@@ -189,11 +284,13 @@ public class PasswordManager
         }
     }
 
-    public void changePassword(String applicationName)
-    {
-        generatePassword(applicationName);
-    }
-
+    /**
+     * Change the master password to the provided value.
+     *
+     * @param newMasterPassword New plaintext master password to use. Cannot be {@code null}.
+     *
+     * @throws NullPointerException if {@code newMasterPassword} is {@code null}.
+     */
     public void changeMasterPassword(String newMasterPassword)
     {
         Preconditions.checkNotNull(newMasterPassword, "newMasterPassword cannot be null.");
@@ -213,6 +310,9 @@ public class PasswordManager
         }
     }
 
+    /**
+     * Runnable task to encrypt and store the current password map to disk.
+     */
     private final class StorePasswordTask implements Runnable
     {
         @Override
