@@ -14,16 +14,7 @@
         tools:showIn="@layout/activity_main"
         tools:context="com.rtoth.password.android.MainActivity">
 
-    <!--<TextView-->
-            <!--android:id="@+id/test_text_field"-->
-            <!--android:layout_width="fill_parent"-->
-            <!--android:layout_height="wrap_content"-->
-            <!--android:scrollbars="vertical"-->
-            <!--android:textColor="#AAAAAA"-->
-            <!--android:text="This is a test"/>-->
-
-    <ListView xmlns:android="http://schemas.android.com/apk/res/android"
-              android:id="@+id/application_list"
+    <ListView android:id="@+id/application_list"
               android:layout_width="wrap_content"
               android:layout_height="wrap_content" />
 

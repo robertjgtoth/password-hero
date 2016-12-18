@@ -14,7 +14,7 @@ subprojects {
 
     // Repository for subcomponents to use
     repositories {
-        mavenCentral()
+        jcenter()
     }
 }
 
