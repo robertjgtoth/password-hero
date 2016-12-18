@@ -30,22 +30,31 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Optional;
 
+import javafx.animation.KeyFrame;
+import javafx.animation.KeyValue;
+import javafx.animation.Timeline;
 import javafx.application.Application;
+import javafx.event.ActionEvent;
+import javafx.event.EventHandler;
 import javafx.geometry.Insets;
 import javafx.scene.Scene;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonType;
+import javafx.scene.control.DialogEvent;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
+import javafx.scene.control.ProgressBar;
 import javafx.scene.control.TextField;
 import javafx.scene.control.TextInputDialog;
 import javafx.scene.layout.AnchorPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
+import javafx.scene.layout.VBox;
 import javafx.scene.text.Font;
 import javafx.stage.Stage;
+import javafx.util.Duration;
 
 /**
  * Main application entry point.
@@ -57,6 +66,9 @@ public class ApplicationController extends Application
 
     /** Minimum height of the application. */
     private static final double MIN_APPLICATION_HEIGHT = 250.0;
+
+    /** Maximum number of seconds to display a password before closing the dialog. */
+    private static final double PASSWORD_VIEW_DURATION_SECS = 30.0;
 
     /** Static location of the passwords file in the user's home directory. */
     private static final String FILE_SUFFIX = ".password-hero" + File.separator + "encrypted.gpg";
@@ -265,18 +277,40 @@ public class ApplicationController extends Application
             alert.setTitle("Saved password");
             alert.setHeaderText("Saved password for " + application + "");
 
+            VBox root = new VBox(5);
+
             TextField savedPasswordText = new TextField(savedPassword);
             savedPasswordText.setEditable(false);
             HBox.setHgrow(savedPasswordText, Priority.ALWAYS);
 
-            HBox hBox = new HBox();
-            hBox.getChildren().add(savedPasswordText);
-            hBox.setPadding(new Insets(20));
+            HBox passwordHBox = new HBox();
+            passwordHBox.prefWidthProperty().bind(root.widthProperty());
+            passwordHBox.setPadding(new Insets(5));
+            passwordHBox.getChildren().add(savedPasswordText);
 
-            alert.getDialogPane().setContent(hBox);
+            ProgressBar progressBar = new ProgressBar(0);
+            progressBar.prefWidthProperty().bind(root.widthProperty());
+            progressBar.setPrefHeight(24);
+            progressBar.setPadding(new Insets(5));
 
-            // FIXME: Figure out how to put this on a timer so it auto-closes after like 30 seconds.
-            alert.showAndWait();
+            root.getChildren().addAll(progressBar, passwordHBox);
+
+            Timeline timeline = new Timeline(
+                new KeyFrame(
+                    Duration.ZERO,
+                    new KeyValue(progressBar.progressProperty(), 0)
+                ),
+                new KeyFrame(
+                    Duration.seconds(PASSWORD_VIEW_DURATION_SECS),
+                    event -> alert.close(),
+                    new KeyValue(progressBar.progressProperty(), 1)
+                )
+            );
+
+            alert.getDialogPane().setContent(root);
+            alert.show();
+            alert.setOnCloseRequest(e -> timeline.stop());
+            timeline.playFromStart();
         }
     }
 
