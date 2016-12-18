@@ -7,7 +7,7 @@ A very simple password management utility written in java.
 - standalone
     - Simple standalone desktop UI written in JavaFX.
     - To run using gradle: <code>gradlew run</code>
-  android
+- android
     - Simple android application UI.
     
 ## Building
