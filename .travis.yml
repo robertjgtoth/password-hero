@@ -16,3 +16,5 @@ addons:
       - oracle-java8-installer
 before_install:
   - chmod +x gradlew
+script:
+  - ./gradlew clean build
