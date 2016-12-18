@@ -1,5 +1,8 @@
 rootProject.name = 'password-hero'
 
+include 'android'
+project(':android').name = 'password-hero-android'
+
 include 'core'
 project(':core').name = 'password-hero-core'
 

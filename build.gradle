@@ -15,21 +15,14 @@ subprojects {
     // Repository for subcomponents to use
     repositories {
         mavenCentral()
-
-
-//    gradle.projectsEvaluated {
-//        tasks.withType(JavaCompile) {
-//            options.compilerArgs << "-Xlint:unchecked" << "-Xlint:deprecation"
-//            sourceCompatibility = 1.6
-//            targetCompatibility = 1.6
-//        }
     }
-
 }
 
 // Third-party library
 ext.artifactDep =
     [
+        'android-appcompat': 'com.android.support:appcompat-v7:24.+',
+        'android-design': 'com.android.support:design:24.+',
         'guava' : 'com.google.guava:guava:20.0',
         'jasypt': 'org.jasypt:jasypt:1.9.2',
         'junit': 'junit:junit:4.11',

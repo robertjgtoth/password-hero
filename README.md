@@ -3,10 +3,12 @@ A very simple password management utility written in java.
 
 ## Subprojects
 - core
-    - Core password management functionality like encryption and storage/retrieval.
+    - Core password management functionality like encryption and storage/retrieval.    
 - standalone
     - Simple standalone desktop UI written in JavaFX.
     - To run using gradle: <code>gradlew run</code>
+  android
+    - Simple android application UI.
     
 ## Building
 - This application builds from the top level using gradle: <code>gradlew clean assemble</code>
