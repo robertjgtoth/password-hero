@@ -1,7 +1,7 @@
 /*
  * https://gist.github.com/drguildo/ba2834bf52d624113041
  */
-package com.rtoth.password.ui;
+package com.rtoth.password.standalone.ui;
 
 import javafx.application.Platform;
 import javafx.geometry.Insets;

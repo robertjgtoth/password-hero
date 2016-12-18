@@ -1,0 +1,10 @@
+apply plugin: 'java'
+
+dependencies {
+    compile artifactDep['guava'],
+            artifactDep['jasypt'],
+            artifactDep['slf4j-api'],
+            artifactDep['slf4j-simple']
+
+    testCompile artifactDep['junit']
+}

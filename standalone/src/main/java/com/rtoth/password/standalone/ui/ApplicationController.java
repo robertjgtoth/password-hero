@@ -19,9 +19,9 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-package com.rtoth.password.ui;
+package com.rtoth.password.standalone.ui;
 
-import com.rtoth.password.data.PasswordManager;
+import com.rtoth.password.core.PasswordManager;
 
 import org.jasypt.exceptions.EncryptionOperationNotPossibleException;
 

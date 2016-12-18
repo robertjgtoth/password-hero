@@ -1,2 +1,8 @@
 rootProject.name = 'password-hero'
 
+include 'core'
+project(':core').name = 'password-hero-core'
+
+include 'standalone'
+project(':standalone').name = 'password-hero-standalone'
+

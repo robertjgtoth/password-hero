@@ -19,7 +19,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-package com.rtoth.password.data;
+package com.rtoth.password.core;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
@@ -45,7 +45,7 @@ import javafx.collections.ObservableList;
 
 /**
  * Manages CRUD operations on application passwords, including
- * storage/retrieval of encrypted data from the filesystem.
+ * storage/retrieval of encrypted core from the filesystem.
  */
 public class PasswordManager
 {

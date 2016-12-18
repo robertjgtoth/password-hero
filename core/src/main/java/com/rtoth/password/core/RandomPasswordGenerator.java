@@ -19,7 +19,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-package com.rtoth.password.data;
+package com.rtoth.password.core;
 
 /**
  * Generates random string passwords.

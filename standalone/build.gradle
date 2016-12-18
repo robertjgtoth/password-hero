@@ -1,0 +1,13 @@
+apply plugin: 'java'
+apply plugin: 'application'
+
+mainClassName = "com.rtoth.password.standalone.ui.ApplicationController"
+
+dependencies {
+    compile project(":password-hero-core"),
+            artifactDep['guava'],
+            artifactDep['slf4j-api'],
+            artifactDep['slf4j-simple']
+
+    testCompile artifactDep['junit']
+}

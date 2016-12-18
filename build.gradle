@@ -1,20 +1,38 @@
-group 'com.rtoth.password'
-version '1.0-SNAPSHOT'
+// Get the project version from the .version file
+// if it's available, otherwise the version is UNKNOWN
+def versionFromFile = 'UNKNOWN'
 
-apply plugin: 'java'
-apply plugin: 'application'
-
-mainClassName = "com.rtoth.password.ui.ApplicationController"
-
-repositories {
-    mavenCentral()
+File versionFile = project.file('.version')
+if (versionFile.exists()) {
+    versionFromFile = versionFile.text.trim()
 }
 
-dependencies {
-    compile 'com.google.guava:guava:20.0',
-            'org.jasypt:jasypt:1.9.2',
-            'org.slf4j:slf4j-api:1.7.22',
-            'org.slf4j:slf4j-simple:1.7.22'
+subprojects {
 
-    testCompile group: 'junit', name: 'junit', version: '4.11'
+    group 'com.rtoth.password-hero'
+    version versionFromFile
+
+    // Repository for subcomponents to use
+    repositories {
+        mavenCentral()
+
+
+//    gradle.projectsEvaluated {
+//        tasks.withType(JavaCompile) {
+//            options.compilerArgs << "-Xlint:unchecked" << "-Xlint:deprecation"
+//            sourceCompatibility = 1.6
+//            targetCompatibility = 1.6
+//        }
+    }
+
 }
+
+// Third-party library
+ext.artifactDep =
+    [
+        'guava' : 'com.google.guava:guava:20.0',
+        'jasypt': 'org.jasypt:jasypt:1.9.2',
+        'junit': 'junit:junit:4.11',
+        'slf4j-api': 'org.slf4j:slf4j-api:1.7.22',
+        'slf4j-simple': 'org.slf4j:slf4j-simple:1.7.22',
+    ];
