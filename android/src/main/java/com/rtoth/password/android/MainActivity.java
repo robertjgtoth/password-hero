@@ -21,21 +21,27 @@
  */
 package com.rtoth.password.android;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.rtoth.password.core.PasswordManager;
 
 import java.util.List;
 
+import android.app.AlertDialog;
 import android.content.Context;
+import android.content.DialogInterface;
+import android.content.Intent;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
+import android.text.InputType;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
+import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.ListView;
 import android.widget.TextView;
@@ -47,7 +53,9 @@ import android.widget.TextView;
  */
 public class MainActivity extends AppCompatActivity
 {
-    // TODO: Actually make this class interact with a PasswordManager
+    private PasswordManager passwordManager;
+
+    private ApplicationListAdapter applicationListAdapter;
 
     @Override
     protected void onCreate(Bundle savedInstanceState)
@@ -57,8 +65,11 @@ public class MainActivity extends AppCompatActivity
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
 
+        passwordManager = UserEnvironment.getInstance().getPasswordManager();
+        applicationListAdapter = new ApplicationListAdapter(this, passwordManager.getAvailableApplications());
+
         ListView applicationListView = (ListView) findViewById(R.id.application_list);
-        applicationListView.setAdapter(new ApplicationListAdapter(this, Lists.newArrayList("One", "Two", "Three")));
+        applicationListView.setAdapter(applicationListAdapter);
     }
 
     @Override
@@ -80,6 +91,11 @@ public class MainActivity extends AppCompatActivity
                 // TODO: Somehow display a settings screen
                 break;
             }
+            case R.id.action_add_application:
+            {
+                addNewApplication();
+                break;
+            }
             default:
             {
                 break;
@@ -87,6 +103,72 @@ public class MainActivity extends AppCompatActivity
         }
 
         return super.onOptionsItemSelected(item);
+    }
+
+    private void addNewApplication()
+    {
+        final AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Title");
+
+        final EditText input = new EditText(this);
+        input.setInputType(InputType.TYPE_CLASS_TEXT);
+        builder.setView(input);
+
+        builder.setPositiveButton("OK", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                String application = input.getText().toString();
+                if (passwordManager.hasPassword(application))
+                {
+                    AlertDialog.Builder error = new AlertDialog.Builder(MainActivity.this);
+                    error.setTitle("Error");
+                    error.setTitle("Application Already Exists!");
+                    error.setNeutralButton("OK", new DialogInterface.OnClickListener()
+                    {
+                        @Override
+                        public void onClick(DialogInterface dialog, int which)
+                        {
+                            dialog.dismiss();
+                        }
+                    });
+                    error.show();
+                }
+                else
+                {
+                    passwordManager.generatePassword(application);
+                    applicationListAdapter.add(application);
+                    showApplicationPassword(application);
+                }
+            }
+        });
+        builder.setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                dialog.cancel();
+            }
+        });
+
+        builder.show();
+    }
+
+    private void showApplicationPassword(String applicationName)
+    {
+        TextView passwordText = new TextView(this);
+        passwordText.setText(passwordManager.getPlaintextPassword(applicationName));
+        passwordText.setTextIsSelectable(true);
+
+        AlertDialog.Builder alert = new AlertDialog.Builder(MainActivity.this);
+        alert.setTitle("Stored Password for " + applicationName);
+        alert.setView(passwordText);
+        alert.setNeutralButton("OK", new DialogInterface.OnClickListener()
+        {
+            @Override
+            public void onClick(DialogInterface dialog, int which)
+            {
+                dialog.dismiss();
+            }
+        });
+        alert.show();
     }
 
     /**
@@ -122,7 +204,7 @@ public class MainActivity extends AppCompatActivity
                 @Override
                 public void onClick(View v)
                 {
-                    System.out.println("Would have shown password for " + applicationName);
+                    showApplicationPassword(applicationName);
                 }
             });
             ImageButton change = (ImageButton)row.findViewById(R.id.change_application_password);
@@ -131,7 +213,9 @@ public class MainActivity extends AppCompatActivity
                 @Override
                 public void onClick(View v)
                 {
-                    System.out.println("Would have changed password for " + applicationName);
+                    // FIXME: Add confirmation dialog
+                    passwordManager.changePassword(applicationName);
+                    showApplicationPassword(applicationName);
                 }
             });
             ImageButton delete = (ImageButton)row.findViewById(R.id.delete_application_password);
@@ -140,7 +224,9 @@ public class MainActivity extends AppCompatActivity
                 @Override
                 public void onClick(View v)
                 {
-                    System.out.println("Would have deleted password for " + applicationName);
+                    // FIXME: Add confirmation dialog
+                    passwordManager.deletePassword(applicationName);
+                    applicationListAdapter.remove(applicationName);
                 }
             });
 

@@ -24,4 +24,12 @@
     <string name="app_name_short">PH</string>
     <string name="action_add_application">New App</string>
     <string name="action_settings">Settings</string>
+    <string name="title_activity_login">Authentication</string>
+
+    <!-- Strings related to login -->
+    <string name="prompt_password">Master Password</string>
+    <string name="action_submit_password">Submit</string>
+    <string name="action_submit_password_short">Submit</string>
+    <string name="error_invalid_password">This password is invalid</string>
+    <string name="error_field_required">This field is required</string>
 </resources>

@@ -22,6 +22,7 @@
 package com.rtoth.password.core;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 
 import org.jasypt.encryption.pbe.StandardPBEStringEncryptor;
@@ -33,6 +34,8 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.Serializable;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.ExecutorService;
@@ -40,14 +43,11 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
-import javafx.collections.FXCollections;
-import javafx.collections.ObservableList;
-
 /**
  * Manages CRUD operations on application passwords, including
  * storage/retrieval of encrypted core from the filesystem.
  */
-public class PasswordManager
+public class PasswordManager implements Serializable
 {
     /** Logger for this class. */
     private static final Logger LOGGER = LoggerFactory.getLogger(PasswordManager.class);
@@ -58,9 +58,6 @@ public class PasswordManager
     /** Generates new random passwords. */
     // FIXME: Make this range configurable or something.
     private final RandomPasswordGenerator passwordGenerator = new AsciiPasswordGenerator(20, 30);
-
-    /** Observable list containing all applications with a password stored. */
-    private final ObservableList<String> availableApplications = FXCollections.observableArrayList();
 
     /** Map of plaintext passwords by application. */
     // FIXME: Figure out a way to make this not plaintext.
@@ -125,22 +122,18 @@ public class PasswordManager
                 application,
                 encryptor.decrypt((String) entry.getValue())
             );
-            availableApplications.add(application);
         }
     }
 
     /**
-     * Get an observable list of all applications with passwords managed by this application.
-     * <p>
-     * As new passwords are generated for applications, or applications have their passwords deleted, this list will be
-     * updated by this class for the benefit of anyone listening.
+     * Get a list of all applications with passwords currently managed by this application.
      *
-     * @return An observable list of all applications with passwords managed by this application. Never {@code null},
+     * @return A ist of all applications with passwords currently managed by this application. Never {@code null},
      *         but may be empty.
      */
-    public ObservableList<String> getAvailableApplications()
+    public List<String> getAvailableApplications()
     {
-        return availableApplications;
+        return Lists.newArrayList(passwordsByApplication.keySet());
     }
 
     /**
@@ -207,7 +200,6 @@ public class PasswordManager
         try
         {
             passwordsByApplication.put(applicationName, passwordGenerator.generatePassword());
-            availableApplications.add(applicationName);
             executorService.submit(new StorePasswordTask());
         }
         finally
@@ -233,7 +225,6 @@ public class PasswordManager
             if (hasPassword(applicationName))
             {
                 passwordsByApplication.remove(applicationName);
-                availableApplications.remove(applicationName);
                 executorService.submit(new StorePasswordTask());
             }
         }

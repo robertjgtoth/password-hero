@@ -34,6 +34,8 @@ import javafx.animation.KeyFrame;
 import javafx.animation.KeyValue;
 import javafx.animation.Timeline;
 import javafx.application.Application;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
 import javafx.scene.Scene;
 import javafx.scene.control.Alert;
@@ -70,6 +72,8 @@ public class ApplicationController extends Application
     /** Static location of the passwords file in the user's home directory. */
     private static final String FILE_SUFFIX = ".password-hero" + File.separator + "encrypted.gpg";
 
+    private final ObservableList<String> allApplications = FXCollections.observableArrayList();
+
     /** Manages all password-related operations. */
     private PasswordManager passwordManager;
 
@@ -97,6 +101,7 @@ public class ApplicationController extends Application
                 try
                 {
                     passwordManager = new PasswordManager(passwordFile.get(), masterPassword.get());
+                    allApplications.addAll(passwordManager.getAvailableApplications());
 
                     Font.loadFont(
                         ApplicationController.class.getResource("/fonts/fontawesome-webfont.ttf").toExternalForm(),
@@ -109,8 +114,7 @@ public class ApplicationController extends Application
                     root.setPrefHeight(MIN_APPLICATION_HEIGHT);
                     root.setMinHeight(MIN_APPLICATION_HEIGHT);
 
-                    final ListView<String> applicationPasswords =
-                        new ListView<>(passwordManager.getAvailableApplications());
+                    final ListView<String> applicationPasswords = new ListView<>(allApplications);
                     applicationPasswords.setCellFactory(param -> new ApplicationPasswordCell());
 
                     AnchorPane.setTopAnchor(applicationPasswords, 0.0);
@@ -132,6 +136,7 @@ public class ApplicationController extends Application
                             if (!passwordManager.hasPassword(newApplication.get()))
                             {
                                 passwordManager.generatePassword(newApplication.get());
+                                allApplications.add(newApplication.get());
                                 showApplicationPassword(newApplication.get());
                             }
                             else
@@ -363,6 +368,7 @@ public class ApplicationController extends Application
                     if (result.isPresent() && result.get().equals(ButtonType.YES))
                     {
                         passwordManager.deletePassword(item);
+                        allApplications.remove(item);
                     }
                 });
 
