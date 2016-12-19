@@ -24,9 +24,6 @@ package com.rtoth.password.android;
 import com.google.common.base.Preconditions;
 import com.rtoth.password.core.PasswordManager;
 
-import java.io.File;
-import java.io.IOException;
-
 /**
  * FIXME: docs
  */
